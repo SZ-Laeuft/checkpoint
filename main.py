@@ -123,7 +123,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # Wait for next UID from thread-safe queue without blocking the event loop
             uid = await asyncio.to_thread(rfid_queue.get)
             rfid_queue.task_done()
-            user = None
+            user = Runner(name="Unknown", surname="User", id=-1)
             if uid == "04CE811B3E6180":
                 user = Runner(name="Maximilian", surname="Dorninger", id=1)
             if uid == "0451F21A3E6180":
