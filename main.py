@@ -1,23 +1,92 @@
+# python
 import asyncio
+import threading
+import time
+import queue as ThreadQueue
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from app.MFRC522Handler import myRFIDReader
 from pydantic import BaseModel
-
 
 class Runner(BaseModel):
     name: str
     surname: str
     id: int
 
-app = FastAPI()
+# Threading primitives and shared queue
+stop_event = threading.Event()
+reader_thread = None
+rfid_queue = ThreadQueue.Queue()
 
-# Initialize the reader once. It's safe because each websocket connection
-# will spawn its own thread to interact with it.
+# Initialize the reader once (hardware resource)
 reader1 = myRFIDReader(bus=0, dev=0)
 
-html = """
-<!DOCTYPE html>
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global reader_thread
+    if reader_thread is None or not reader_thread.is_alive():
+        stop_event.clear()
+        reader_thread = threading.Thread(
+            target=rfid_reader_thread,
+            args=(rfid_queue, stop_event),
+            daemon=True
+        )
+        reader_thread.start()
+        print("Started RFID reader thread")
+
+    yield
+
+    # signal the thread to stop and wait a short time for cleanup
+    stop_event.set()
+    if reader_thread is not None:
+        reader_thread.join(timeout=2)
+
+    # ensure hardware cleanup called (redundant with finally in thread)
+    if hasattr(reader1, "close"):
+        try:
+            reader1.close()
+        except Exception:
+            pass
+    if hasattr(reader1, "cleanup"):
+        try:
+            reader1.cleanup()
+        except Exception:
+            pass
+    print("Shutdown complete: stop_event set and reader joined")
+app = FastAPI(lifespan=lifespan)
+
+def rfid_reader_thread(q: ThreadQueue.Queue, stop_evt: threading.Event):
+    try:
+        while not stop_evt.is_set():
+            try:
+                # Assume reader1.get_uid() yields/returns UIDs; adapt if API differs
+                for uid in reader1.get_uid():
+                    if stop_evt.is_set():
+                        break
+                    q.put(uid)
+                # small sleep to avoid busy loop; adjust as needed
+                time.sleep(0.01)
+            except Exception as exc:
+                print(f"RFID reader error: {exc}")
+                time.sleep(0.5)
+    finally:
+        # optional hardware cleanup if available
+        if hasattr(reader1, "close"):
+            try:
+                reader1.close()
+            except Exception:
+                pass
+        if hasattr(reader1, "cleanup"):
+            try:
+                reader1.cleanup()
+            except Exception:
+                pass
+        print("RFID reader thread exited")
+
+
+html = """<!DOCTYPE html>
 <html>
   <head>
     <title>WebSocket Test</title>
@@ -26,15 +95,8 @@ html = """
     <h1>WebSocket Test</h1>
     <script>
       const socket = new WebSocket(`ws://${window.location.host}/ws`);
-      
-      socket.onopen = function(e) {
-        console.log("[open] Connection established");
-      };
-      
-      socket.onmessage = function(event) {
-        console.log(`[message] Data received from server: ${event.data}`);        
-      };
-      
+      socket.onopen = function(e) { console.log("[open] Connection established"); };
+      socket.onmessage = function(event) { console.log(`[message] Data received from server: ${event.data}`); };
       socket.onclose = function(event) {
         if (event.wasClean) {
           console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
@@ -42,15 +104,9 @@ html = """
           console.log('[close] Connection died');
         }
       };
-      
-      socket.onerror = function(error) {
-        console.log(`[error]`, error);
-        
-      };
+      socket.onerror = function(error) { console.log(`[error]`, error); };
     </script>
-    
-    <ul id="list">
-    </ul>
+    <ul id="list"></ul>
   </body>
 </html>
 """
@@ -59,39 +115,14 @@ html = """
 async def get():
     return html
 
-
-# This is a regular (synchronous) function that will run in a separate thread.
-# It reads from the RFID device and puts the UID into a queue.
-def rfid_reader_thread(queue: asyncio.Queue):
-    # This loop will run forever in the background.
-    for uid in reader1.get_uid():
-        # 'put_nowait' is safe to call from a regular synchronous function.
-        # It adds the item to the asyncio queue.
-        queue.put_nowait(uid)
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-
-    # Create an asyncio Queue. This is a thread-safe way to pass
-    # data between the asyncio event loop and other threads.
-    queue = asyncio.Queue()
-    loop = asyncio.get_event_loop()
-
-    # Start the blocking RFID reader function in a separate thread.
-    # It will start putting UIDs into the 'queue'.
-    reader_task = loop.run_in_executor(
-        None,  # Use the default thread pool executor
-        rfid_reader_thread,
-        queue
-    )
-
     try:
         while True:
-            # Wait for a UID to appear in the queue.
-            # 'await queue.get()' will pause here without blocking the server,
-            # waiting for the reader thread to add an item.
-            uid = await queue.get()
+            # Wait for next UID from thread-safe queue without blocking the event loop
+            uid = await asyncio.to_thread(rfid_queue.get)
+            rfid_queue.task_done()
             user = None
             if uid == "04CE811B3E6180":
                 user = Runner(name="Maximilian", surname="Dorninger", id=1)
@@ -103,15 +134,9 @@ async def websocket_endpoint(websocket: WebSocket):
             print(f"Sending data: {user}")
             await websocket.send_text(user.model_dump_json())
             print("Successfully sent data")
-
-            # Mark the queue task as done.
-            queue.task_done()
-
     except WebSocketDisconnect:
         print("Client disconnected")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred in websocket: {e}")
     finally:
-        # Clean up the background task when the client disconnects.
-        reader_task.cancel()
-        print("Closing WebSocket connection and stopping reader thread.")
+        print("WebSocket handler finished")
