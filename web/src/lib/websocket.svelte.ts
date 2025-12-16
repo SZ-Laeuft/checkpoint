@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import {setContext} from "svelte";
 
-interface UserData {
+export interface UserData {
     id: string | null;
     name: string;
     surname: string;
@@ -12,11 +12,12 @@ const initialState: UserData = {
     name: '',
     surname: '',
 };
-
+export let user: UserData = $state(initialState)
 let socket: WebSocket | null = null;
 let reconnectTimeout: ReturnType<typeof setTimeout>;
 
 export function connectWebSocket(url: string) {
+    console.log("Websocket connecting to:", url);
     function connect() {
         // Close existing connection if any
         if (socket) {
@@ -33,13 +34,20 @@ export function connectWebSocket(url: string) {
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                // Validate we received the expected fields
+
                 if (data.id && data.name && data.surname) {
-                    setContext("user", () => ({
-                        id: data.id,
-                        name: data.name,
-                        surname: data.surname
-                    }));
+                    user.id = data.id;
+                    user.name = data.name;
+                    user.surname = data.surname;
+
+                    // clear user data after 6 seconds, if it hasn't changed
+                    setTimeout((id: string | null = user.id) => {
+                        if (id === user.id) {
+                        user.id = null;
+                        user.name = '';
+                        user.surname = '';
+                        }
+                    }, 6000);
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);
