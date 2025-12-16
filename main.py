@@ -87,36 +87,6 @@ def rfid_reader_thread(q: ThreadQueue.Queue, stop_evt: threading.Event):
                 pass
         print("RFID reader thread exited")
 
-
-html = """<!DOCTYPE html>
-<html>
-  <head>
-    <title>WebSocket Test</title>
-  </head>
-  <body>
-    <h1>WebSocket Test</h1>
-    <script>
-      const socket = new WebSocket(`ws://${window.location.host}/ws`);
-      socket.onopen = function(e) { console.log("[open] Connection established"); };
-      socket.onmessage = function(event) { console.log(`[message] Data received from server: ${event.data}`); };
-      socket.onclose = function(event) {
-        if (event.wasClean) {
-          console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
-        } else {
-          console.log('[close] Connection died');
-        }
-      };
-      socket.onerror = function(error) { console.log(`[error]`, error); };
-    </script>
-    <ul id="list"></ul>
-  </body>
-</html>
-"""
-
-@app.get("/", response_class=HTMLResponse)
-async def get():
-    return html
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
