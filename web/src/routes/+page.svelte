@@ -2,7 +2,6 @@
     import { getContext, onMount } from 'svelte';
     import {connectWebSocket, type UserData, user, getWebSocketState} from '$lib/websocket.svelte';
     import { PUBLIC_SERVER_API_URL } from "$env/static/public";
-    import UserDisplay from "$lib/user-display.svelte";
     let time = $state(new Date());
     let socketError: boolean = $state(true);
     onMount(() => {
@@ -41,7 +40,13 @@
         </div>
     {:else}
         <div class="w-screen h-screen text-white flex flex-col items-center justify-center gap-4 bg-green-600 p-4">
-            <UserDisplay {user} />
+            <ol>
+                <li>{user.name} {user.surname}</li>
+                <div class="text-[0.7em]">
+                    <li>Rundenanzahl: {user.lap_count}</li>
+                    <li>Bestzeit: {user.best_time}</li>
+                </div>
+            </ol>
         </div>
     {/if}
 </main>
