@@ -5,12 +5,16 @@ export interface UserData {
     id: number | null;
     name: string;
     surname: string;
+    best_time: string
+    lap_count: number
 }
 
 const initialState: UserData = {
     id: null,
     name: '',
     surname: '',
+    best_time: '',
+    lap_count: 0
 };
 
 export let user: UserData = $state(initialState);
@@ -45,6 +49,8 @@ export function connectWebSocket(url: string) {
                     user.id = data.id;
                     user.name = data.name;
                     user.surname = data.surname;
+                    user.best_time = data.best_time;
+                    user.lap_count = data.lap_count;
 
                     // Reset the timeout whenever new data is received
                     clearTimeout(clearUserTimeout); // Clear the existing timeout
@@ -53,6 +59,8 @@ export function connectWebSocket(url: string) {
                             user.id = null;
                             user.name = '';
                             user.surname = '';
+                            user.best_time = '';
+                            user.lap_count = 0;
                         }
                     }, (user.id === -1 ? 10000 : 6000)); // Use the appropriate timeout duration
                 }

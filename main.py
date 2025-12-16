@@ -14,6 +14,8 @@ class Runner(BaseModel):
     name: str
     surname: str
     id: int
+    best_time: str
+    lap_count: int
 
 # Threading primitives and shared queue
 stop_event = threading.Event()
@@ -123,13 +125,13 @@ async def websocket_endpoint(websocket: WebSocket):
             # Wait for next UID from thread-safe queue without blocking the event loop
             uid = await asyncio.to_thread(rfid_queue.get)
             rfid_queue.task_done()
-            user = Runner(name="Unknown", surname="User", id=-1)
+            user = Runner(name="Unknown", surname="User", id=-1, best_time="N/A", lap_count=0)
             if uid == "04CE811B3E6180":
-                user = Runner(name="Maximilian", surname="Dorninger", id=1)
+                user = Runner(name="Maximilian", surname="Dorninger", id=1, best_time="00:45:32", lap_count=5)
             if uid == "0451F21A3E6180":
-                user = Runner(name="Manuel", surname="Hofmarcher", id=2)
+                user = Runner(name="Manuel", surname="Hofmarcher", id=2, best_time="00:47:15", lap_count=4)
             if uid == "044CC51A3E6180":
-                user = Runner(name="Alexander", surname="Thir", id=3)
+                user = Runner(name="Alexander", surname="Thir", id=3, best_time="00:46:50", lap_count=6)
 
             print(f"Sending data: {user}")
             await websocket.send_text(user.model_dump_json())
