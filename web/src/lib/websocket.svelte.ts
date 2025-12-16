@@ -1,8 +1,8 @@
 import { writable } from 'svelte/store';
-import {setContext} from "svelte";
+import { setContext } from "svelte";
 
 export interface UserData {
-    id: string | null;
+    id: number | null;
     name: string;
     surname: string;
 }
@@ -12,12 +12,18 @@ const initialState: UserData = {
     name: '',
     surname: '',
 };
-export let user: UserData = $state(initialState)
+
+export let user: UserData = $state(initialState);
 let socket: WebSocket | null = null;
 let reconnectTimeout: ReturnType<typeof setTimeout>;
+let clearUserTimeout: ReturnType<typeof setTimeout>;
 
+export function getWebSocketState(): boolean {
+    return socket?.readyState === WebSocket.OPEN;
+}
 export function connectWebSocket(url: string) {
     console.log("Websocket connecting to:", url);
+
     function connect() {
         // Close existing connection if any
         if (socket) {
@@ -40,14 +46,15 @@ export function connectWebSocket(url: string) {
                     user.name = data.name;
                     user.surname = data.surname;
 
-                    // clear user data after 6 seconds, if it hasn't changed
-                    setTimeout((id: string | null = user.id) => {
-                        if (id === user.id) {
-                        user.id = null;
-                        user.name = '';
-                        user.surname = '';
+                    // Reset the timeout whenever new data is received
+                    clearTimeout(clearUserTimeout); // Clear the existing timeout
+                    clearUserTimeout = setTimeout(() => {
+                        if (user.id === data.id) { // Double-check current user ID matches to avoid race conditions
+                            user.id = null;
+                            user.name = '';
+                            user.surname = '';
                         }
-                    }, 6000);
+                    }, (user.id === -1 ? 10000 : 6000)); // Use the appropriate timeout duration
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);
@@ -71,10 +78,10 @@ export function connectWebSocket(url: string) {
     // Return a cleanup function
     return () => {
         if (socket) {
-            // Remove listener to prevent auto-reconnect on manual cleanup
             socket.onclose = null;
             socket.close();
         }
         clearTimeout(reconnectTimeout);
+        clearTimeout(clearUserTimeout);
     };
 }
