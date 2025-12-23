@@ -86,29 +86,58 @@ def rfid_reader_thread(q: ThreadQueue.Queue, stop_evt: threading.Event):
             except Exception:
                 pass
         print("RFID reader thread exited")
+import json # Don't forget to import json
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    try:
-        while True:
-            # Wait for next UID from thread-safe queue without blocking the event loop
-            uid = await asyncio.to_thread(rfid_queue.get)
-            rfid_queue.task_done()
-            user = Runner(name="Unknown", surname="User", id=-1, best_time="N/A", lap_count=0)
-            if uid == "04CE811B3E6180":
-                user = Runner(name="Maximilian", surname="Dorninger", id=1, best_time="00:45:32", lap_count=5)
-            if uid == "0451F21A3E6180":
-                user = Runner(name="Manuel", surname="Hofmarcher", id=2, best_time="00:47:15", lap_count=4)
-            if uid == "044CC51A3E6180":
-                user = Runner(name="Alexander", surname="Thir", id=3, best_time="00:46:50", lap_count=6)
 
-            print(f"Sending data: {user}")
-            await websocket.send_text(user.model_dump_json())
-            print("Successfully sent data")
-    except WebSocketDisconnect:
-        print("Client disconnected")
-    except Exception as e:
-        print(f"An error occurred in websocket: {e}")
-    finally:
-        print("WebSocket handler finished")
+    # listen for pings (keepalive messages) and pong back
+    async def keepalive_listener():
+        try:
+            while True:
+                data = await websocket.receive_text()
+                try:
+                    message = json.loads(data)
+                    if message.get("type") == "ping":
+                        print("Received Ping, sending Pong")
+                        await websocket.send_text(json.dumps({"type": "pong"}))
+                except json.JSONDecodeError:
+                    pass
+        except WebSocketDisconnect:
+            print("ping reader disconnected")
+
+    # send data from rfid reader
+    async def rfid_sender():
+        try:
+            while True:
+                uid = await asyncio.to_thread(rfid_queue.get)
+                rfid_queue.task_done()
+
+                user = Runner(name="Unknown", surname="User", id=-1, best_time="N/A", lap_count=0)
+                if uid == "04CE811B3E6180":
+                    user = Runner(name="Maximilian", surname="Dorninger", id=1, best_time="00:45:32", lap_count=5)
+                elif uid == "0451F21A3E6180":
+                    user = Runner(name="Manuel", surname="Hofmarcher", id=2, best_time="00:47:15", lap_count=4)
+                elif uid == "044CC51A3E6180":
+                    user = Runner(name="Alexander", surname="Thir", id=3, best_time="00:46:50", lap_count=6)
+
+                print(f"Sending data for UID: {uid}")
+                await websocket.send_text(user.model_dump_json())
+        except asyncio.CancelledError:
+            print("RFID reader task cancelled")
+        except Exception as e:
+            print(f"Error in sender: {e}")
+
+
+    listener_task = asyncio.create_task(keepalive_listener())
+    sender_task = asyncio.create_task(rfid_sender())
+
+    # If either one of the tasks finishes, the other one will be stopped
+    # so it doesn't get stuck waiting forever
+    done, pending = await asyncio.wait(
+        [listener_task, sender_task],
+        return_when=asyncio.FIRST_COMPLETED
+    )
+    for task in pending:
+        task.cancel()
