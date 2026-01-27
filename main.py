@@ -1,29 +1,53 @@
 # python
 import asyncio
+import os
 import threading
 import time
 import queue as ThreadQueue
 from contextlib import asynccontextmanager
-
+import datetime
+import requests
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from app.MFRC522Handler import myRFIDReader
 from pydantic import BaseModel
 
-class Runner(BaseModel):
+
+class UserDataMessage(BaseModel):
     name: str
     surname: str
     id: int
-    best_time: str
+    best_time: int
     lap_count: int
+
+
+class Runner(BaseModel):
+    runnerId: int
+    firstname: str | None
+    lastname: str | None
+    gender: str | None
+    birthdate: str | None
+
+
+class Participate(BaseModel):
+    participateId: int
+    teamId: int | None
+    tagId: str | None
+    runnerId: int | None
+    eventId: int | None
+    categoryId: int | None
+
 
 # Threading primitives and shared queue
 stop_event = threading.Event()
 reader_thread = None
 rfid_queue = ThreadQueue.Queue()
 
+API_URL = os.getenv("API_URL", "http://192.168.68.31:8080/api")
+
 # Initialize the reader once (hardware resource)
 reader1 = myRFIDReader(bus=0, dev=0)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,7 +81,10 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
     print("Shutdown complete: stop_event set and reader joined")
+
+
 app = FastAPI(lifespan=lifespan)
+
 
 def rfid_reader_thread(q: ThreadQueue.Queue, stop_evt: threading.Event):
     try:
@@ -86,7 +113,10 @@ def rfid_reader_thread(q: ThreadQueue.Queue, stop_evt: threading.Event):
             except Exception:
                 pass
         print("RFID reader thread exited")
-import json # Don't forget to import json
+
+
+import json  # Don't forget to import json
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -114,21 +144,38 @@ async def websocket_endpoint(websocket: WebSocket):
                 uid = await asyncio.to_thread(rfid_queue.get)
                 rfid_queue.task_done()
 
-                user = Runner(name="Unknown", surname="User", id=-1, best_time="N/A", lap_count=0)
-                if uid == "04CE811B3E6180":
-                    user = Runner(name="Maximilian", surname="Dorninger", id=1, best_time="00:45:32", lap_count=5)
-                elif uid == "0451F21A3E6180":
-                    user = Runner(name="Manuel", surname="Hofmarcher", id=2, best_time="00:47:15", lap_count=4)
-                elif uid == "044CC51A3E6180":
-                    user = Runner(name="Alexander", surname="Thir", id=3, best_time="00:46:50", lap_count=6)
+                with requests.session() as session:
+                    tag_id = int(uid, 16)
+                    participateObjects: list = session.get(f"{API_URL}/participates/by-tagId/{str(tag_id)}").json()
+                    if len(participateObjects) == 0:
+                        continue
+                    participate = Participate.model_validate(participateObjects[0])
+                    print(API_URL + "/runners/" + str(participate.runnerId))
+                    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                    new_round_data = {"participateid": participate.participateId,
+                                      "roundtimestamp": str(timestamp)}
+                    print(f"new round data: {new_round_data}")
+                    new_round = session.post(API_URL + "/rounds/", json=new_round_data)
+                    print(new_round.status_code)
 
-                print(f"Sending data for UID: {uid}")
-                await websocket.send_text(user.model_dump_json())
+                    runner = session.get(API_URL + "/runners/" + str(participate.runnerId)).json()
+                    runner = Runner.model_validate(runner)
+                    print(runner)
+                    best_time = session.get(API_URL + "/besttime/" + str(participate.runnerId)).json()
+                    best_time = int(best_time.get("bestTime"))
+                    print(best_time)
+                    round_count = session.get(API_URL + "/rounds/get-round-count/" + str(participate.participateId))
+                    round_count = int(round_count.content)
+
+                    user = UserDataMessage(id=runner.runnerId, name=runner.firstname, surname=runner.lastname,
+                                           best_time=best_time, lap_count=round_count)
+
+                    print(f"Sending data: {user.model_dump_json()}")
+                    await websocket.send_text(user.model_dump_json())
         except asyncio.CancelledError:
             print("RFID reader task cancelled")
         except Exception as e:
             print(f"Error in sender: {e}")
-
 
     listener_task = asyncio.create_task(keepalive_listener())
     sender_task = asyncio.create_task(rfid_sender())
