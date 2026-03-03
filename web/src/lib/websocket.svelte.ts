@@ -7,7 +7,6 @@ export interface UserData {
     best_time: string;
     lap_count: number;
 }
-
 const initialState: UserData = {
     id: null,
     name: '',
@@ -90,8 +89,6 @@ export function connectWebSocket(url: string) {
                     user.surname = data.surname;
                     user.best_time = data.best_time;
                     user.lap_count = data.lap_count;
-
-                    // Reset the user clearing logic
                     clearTimeout(clearUserTimeout);
                     clearUserTimeout = setTimeout(() => {
                         // Double check identity before clearing to prevent race conditions
@@ -99,6 +96,7 @@ export function connectWebSocket(url: string) {
                             Object.assign(user, initialState);
                         }
                     }, (user.id === -1 ? 10000 : 6000));
+
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);

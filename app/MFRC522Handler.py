@@ -1,55 +1,46 @@
 from app.MFRC522 import MFRC522
-import signal
 import time
+import logging
 
-continue_reading = True
+logger = logging.getLogger("rfid_app")
 
 def uidToString(uid):
-    mystring = ""
-    for i in uid:
-        mystring = mystring + format(i, '02X')
-    return mystring
-
-
-def end_read(signal, frame):
-    global continue_reading
-    print("Ctrl+C captured, ending read.")
-    continue_reading = False
-
-signal.signal(signal.SIGINT, end_read)
+    if not uid: return ""
+    return "".join(format(i, '02X') for i in uid)
 
 class myRFIDReader(MFRC522):
-    def __init__(self,bus=0,dev=0):
-        super().__init__(bus=bus,dev=dev)
+    def __init__(self, bus=0, dev=0):
+        super().__init__(bus=bus, dev=dev)
         self.key = None
         self.keyIn = False
-        self.keyValidCount=0;
+        self.keyValidCount = 0
 
     def Read(self):
-        status, TagType = self.MFRC522_Request(super().PICC_REQIDL)
+        status, TagType = self.MFRC522_Request(self.PICC_REQIDL)
         if status == self.MI_OK:
             status, uid = self.MFRC522_SelectTagSN()
             if status == self.MI_OK:
-                self.keyIn=True
-                self.keyValidCount=2
+                self.keyIn = True
+                self.keyValidCount = 2
                 if self.key != uid:
                     self.key = uid
-                    if uid is None:
-                        return False
-                    return True
+                    return uid is not None
         else:
             if self.keyIn:
-                if self.keyValidCount>0:
-                    self.keyValidCount= self.keyValidCount - 1
+                if self.keyValidCount > 0:
+                    self.keyValidCount -= 1
                 else:
-                    self.keyIn=False
-                    self.key=None
+                    self.keyIn = False
+                    self.key = None
         return False
 
-    def get_uid(self):
-        while True:
-            if self.Read():
-                uid = uidToString(self.key)
-                print(f"Read UID: {uid}")
-                yield uid
-            time.sleep(0.010)
+    def get_uid(self, stop_event):
+        """Generator that yields UIDs until stop_event is set."""
+        while not stop_event.is_set():
+            try:
+                if self.Read():
+                    uid_str = uidToString(self.key)
+                    yield uid_str
+            except Exception:
+                logger.exception("Hardware read error")
+            time.sleep(0.05)
