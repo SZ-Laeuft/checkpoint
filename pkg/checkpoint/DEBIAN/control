@@ -1,0 +1,8 @@
+Package: checkpoint
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: arm64
+Maintainer: Maximilian Dorninger maximilian.dorninger@sz-ybbs.ac.at
+Depends: python3, python3-venv
+Description: RFID checkpoint FastAPI service with Svelte frontend

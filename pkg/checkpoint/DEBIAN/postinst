@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eux
+
+cd /opt/checkpoint
+
+command -v uv >/dev/null 2>&1
+test -f pyproject.toml
+test -f uv.lock
+
+uv sync --frozen --no-dev
+/opt/checkpoint/.venv/bin/python -c "import uvicorn, fastapi"
+
+systemctl daemon-reload
+systemctl enable checkpoint.service
+systemctl restart checkpoint.service

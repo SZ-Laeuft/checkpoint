@@ -1,0 +1,1 @@
+export const env={"PUBLIC_SERVER_API_URL":"ws://localhost:8000/ws"}

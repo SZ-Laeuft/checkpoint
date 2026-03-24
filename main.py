@@ -12,6 +12,8 @@ import requests
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from app.MFRC522Handler import myRFIDReader
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -67,6 +69,8 @@ def rfid_reader_thread(q, stop_evt):
 async def send_error_msg(websocket):
     msg = UserDataMessage(id=-1, name="Error", surname="Error", best_time=0, lap_count=0)
     await websocket.send_text(msg.model_dump_json())
+
+app.mount("/static", StaticFiles(directory="./static", html=True), name="static")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

@@ -1,0 +1,155 @@
+import { writable } from 'svelte/store';
+
+export interface UserData {
+    id: number | null;
+    name: string;
+    surname: string;
+    best_time: string;
+    lap_count: number;
+}
+const initialState: UserData = {
+    id: null,
+    name: '',
+    surname: '',
+    best_time: '',
+    lap_count: 0
+};
+
+export let user: UserData = $state(initialState);
+
+// Configuration
+const MAX_RECONNECT_DELAY = 30000; // set maximum cap of delay to 30 seconds
+const BASE_RECONNECT_DELAY = 1000;
+const HEARTBEAT_INTERVAL = 5000;
+const PING_TIMEOUT = 1000;
+
+let socket: WebSocket | null = null;
+let reconnectTimeout: ReturnType<typeof setTimeout>;
+let clearUserTimeout: ReturnType<typeof setTimeout>;
+let heartbeatInterval: ReturnType<typeof setInterval>;
+let pingTimeout: ReturnType<typeof setTimeout>;
+
+let reconnectAttempts = 0;
+let isIntentionalClose = false;
+
+export function getWebSocketState(): boolean {
+    return socket?.readyState === WebSocket.OPEN;
+}
+
+export function connectWebSocket(url: string) {
+    console.log("WebSocket service started for:", url);
+    isIntentionalClose = false;
+
+    function setupHeartbeat() {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = setInterval(() => {
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+            console.log("Sending Heartbeat...");
+            socket.send(JSON.stringify({ type: 'ping' })); // Adjust based on your server protocol
+
+            // If we don't get a response/message in time, kill it
+            clearTimeout(pingTimeout);
+            pingTimeout = setTimeout(() => {
+                console.warn("Heartbeat timed out. Closing socket.");
+                socket?.close();
+            }, PING_TIMEOUT);
+        }, HEARTBEAT_INTERVAL);
+    }
+
+    function connect() {
+        // If we are already connected or connecting, do nothing
+        if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        console.log(`Attempting connection (Attempt ${reconnectAttempts + 1})...`);
+
+        socket = new WebSocket(url);
+
+        socket.onopen = () => {
+            console.log('WebSocket connected');
+            reconnectAttempts = 0; // Reset backoff on success
+            setupHeartbeat();
+        };
+
+        socket.onmessage = (event) => {
+            clearTimeout(pingTimeout);
+
+            try {
+                const data = JSON.parse(event.data);
+
+                // Handle keepalive messages
+                if (data.type === 'pong') return;
+
+                // handle user data messages
+                if (data.id && data.name && data.surname) {
+                    user.id = data.id;
+                    user.name = data.name;
+                    user.surname = data.surname;
+                    user.best_time = data.best_time;
+                    user.lap_count = data.lap_count;
+                    clearTimeout(clearUserTimeout);
+                    clearUserTimeout = setTimeout(() => {
+                        // Double check identity before clearing to prevent race conditions
+                        if (user.id === data.id) {
+                            Object.assign(user, initialState);
+                        }
+                    }, (user.id === -1 ? 10000 : 6000));
+
+                }
+            } catch (error) {
+                console.error('Failed to parse WebSocket message:', error);
+            }
+        };
+
+        socket.onclose = (event) => {
+            clearInterval(heartbeatInterval);
+            clearTimeout(pingTimeout);
+
+            if (isIntentionalClose) return;
+
+            // Calculate exponential backoff with jitter
+            // Math.min(30s, 1000 * 2^attempts)
+            const delay = Math.min(
+                MAX_RECONNECT_DELAY,
+                (BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts)) + (Math.random() * 1000)
+            );
+
+            console.log(`WebSocket disconnected. Reconnecting in ${Math.round(delay)}ms...`);
+
+            reconnectTimeout = setTimeout(() => {
+                reconnectAttempts++;
+                connect();
+            }, delay);
+        };
+
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            // Verify state is OPEN before trying to close, otherwise onclose fires automatically
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+        };
+    }
+
+    // Initial connection
+    connect();
+
+    // Return cleanup function for Svelte lifecycle
+    return () => {
+        isIntentionalClose = true;
+
+        if (socket) {
+            socket.onclose = null;
+            socket.onmessage = null;
+            socket.onerror = null;
+            socket.close();
+        }
+
+        clearTimeout(reconnectTimeout);
+        clearTimeout(clearUserTimeout);
+        clearInterval(heartbeatInterval);
+        clearTimeout(pingTimeout);
+    };
+}

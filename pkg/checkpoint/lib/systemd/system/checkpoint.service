@@ -1,0 +1,15 @@
+[Unit]
+Description=Checkpoint FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/checkpoint
+EnvironmentFile=/etc/default/checkpoint
+ExecStartPre=/opt/checkpoint/.venv/bin/python -c "import uvicorn, fastapi"
+ExecStart=/opt/checkpoint/.venv/bin/python -m uvicorn main:app --host ${HOST} --port ${PORT}
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
