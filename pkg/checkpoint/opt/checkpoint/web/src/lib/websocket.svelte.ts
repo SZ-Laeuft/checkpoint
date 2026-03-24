@@ -1,5 +1,3 @@
-import { writable } from 'svelte/store';
-
 export interface UserData {
     id: number | null;
     name: string;
@@ -79,29 +77,32 @@ export function connectWebSocket(url: string) {
             try {
                 const data = JSON.parse(event.data);
 
-                // Handle keepalive messages
-                if (data.type === 'pong') return;
+                // Keepalive
+                if (data?.type === 'pong') return;
 
-                // handle user data messages
-                if (data.id && data.name && data.surname) {
+                // Accept payloads based on presence of id, not truthiness of all fields
+                if (typeof data?.id === 'number') {
                     user.id = data.id;
-                    user.name = data.name;
-                    user.surname = data.surname;
-                    user.best_time = data.best_time;
-                    user.lap_count = data.lap_count;
+                    user.name = typeof data.name === 'string' ? data.name : '';
+                    user.surname = typeof data.surname === 'string' ? data.surname : '';
+                    user.best_time = typeof data.best_time === 'string' ? data.best_time : '';
+                    user.lap_count = typeof data.lap_count === 'number' ? data.lap_count : 0;
+
+                    // Always restart clear timer on each scan
                     clearTimeout(clearUserTimeout);
+                    const currentId = user.id;
                     clearUserTimeout = setTimeout(() => {
-                        // Double check identity before clearing to prevent race conditions
-                        if (user.id === data.id) {
+                        // Prevent stale timeout from clearing newer user data
+                        if (user.id === currentId) {
                             Object.assign(user, initialState);
                         }
-                    }, (user.id === -1 ? 10000 : 6000));
-
+                    }, currentId === -1 ? 10000 : 6000);
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);
             }
         };
+
 
         socket.onclose = (event) => {
             clearInterval(heartbeatInterval);
