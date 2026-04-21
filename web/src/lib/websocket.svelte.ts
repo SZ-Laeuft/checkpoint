@@ -73,7 +73,7 @@ export function connectWebSocket(url: string) {
 
         socket.onmessage = (event) => {
             clearTimeout(pingTimeout);
-
+            console.log("WS message:", event.data);
             try {
                 const data = JSON.parse(event.data);
 
