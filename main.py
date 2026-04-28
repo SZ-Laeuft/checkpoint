@@ -72,7 +72,7 @@ class Participate(BaseModel):
 stop_event = threading.Event()
 reader_thread = None
 rfid_queue = ThreadQueue.Queue()
-API_URL = os.getenv("API_URL", "http://192.168.68.31:8080/api")
+API_URL = os.getenv("API_URL", "http://192.168.68.35:8080/api")
 reader1 = myRFIDReader(bus=0, dev=0)
 
 @asynccontextmanager
