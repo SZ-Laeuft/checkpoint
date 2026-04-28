@@ -6,8 +6,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi[standard]>=0.118.0",
+    "gpiozero>=2.0.1",
+    "lgpio>=0.2.2.0",
     "pydantic>=2.11.9",
     "requests>=2.32.5",
+    "rpi-gpio>=0.7.1",
     "spidev>=3.8",
     "uvicorn>=0.37.0",
 ]

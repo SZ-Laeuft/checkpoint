@@ -3,6 +3,11 @@ Version: 0.1.0
 Section: utils
 Priority: optional
 Architecture: arm64
-Maintainer: Maximilian Dorninger maximilian.dorninger@sz-ybbs.ac.at
-Depends: python3, python3-venv
+Maintainer: Maximilian Dorninger <maximilian.dorninger@sz-ybbs.ac.at>
+Depends: python3 (>= 3.11), python3-venv, python3-pip
+Recommends: nodejs (>= 20)
 Description: RFID checkpoint FastAPI service with Svelte frontend
+ NFC reader checkpoint system with real-time WebSocket updates.
+ Includes FastAPI backend and Svelte-based web UI.
+ Starts automatically as a systemd service.
+Homepage: https://github.com/SZ-Laeuft/checkpoint

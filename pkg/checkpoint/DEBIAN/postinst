@@ -1,15 +1,59 @@
 #!/bin/sh
-set -eux
+set -e
 
-cd /opt/checkpoint
+echo "⚙️  Setting up Checkpoint service..."
 
-command -v uv >/dev/null 2>&1
-test -f pyproject.toml
-test -f uv.lock
+APP_DIR="/opt/checkpoint"
+VENV_DIR="$APP_DIR/.venv"
 
-uv sync --frozen --no-dev
-/opt/checkpoint/.venv/bin/python -c "import uvicorn, fastapi"
+# Step 1: Create virtual environment
+echo "📦 Creating Python virtual environment..."
+python3 -m venv "$VENV_DIR"
 
+# Step 2: Upgrade pip
+echo "🔄 Upgrading pip..."
+"$VENV_DIR/bin/pip" install --upgrade pip setuptools wheel
+
+# Step 3: Install uv in venv (for faster/reproducible installs)
+echo "🚀 Installing uv..."
+"$VENV_DIR/bin/pip" install uv
+
+# Step 4: Sync dependencies using uv (with frozen lock for reproducibility)
+echo "📥 Syncing Python dependencies..."
+cd "$APP_DIR"
+if [ -f "uv.lock" ]; then
+    "$VENV_DIR/bin/uv" sync --frozen --no-dev
+else
+    echo "⚠️  uv.lock not found, using pyproject.toml"
+    "$VENV_DIR/bin/uv" sync --no-dev
+fi
+
+# Step 5: Verify dependencies
+echo "✓ Verifying dependencies..."
+"$VENV_DIR/bin/python" -c "import uvicorn, fastapi; print(f'✓ uvicorn {uvicorn.__version__}'); print(f'✓ fastapi {fastapi.__version__}')" || {
+    echo "❌ Dependency verification failed"
+    exit 1
+}
+
+# Step 6: Set permissions
+chmod 755 "$APP_DIR"
+
+# Step 7: Enable and start systemd service
+echo "🚀 Enabling Checkpoint service..."
 systemctl daemon-reload
 systemctl enable checkpoint.service
-systemctl restart checkpoint.service
+
+# Only start if not already running
+if ! systemctl is-active --quiet checkpoint.service; then
+    systemctl start checkpoint.service
+fi
+
+echo "✅ Checkpoint installed successfully!"
+echo "📍 Location: $APP_DIR"
+echo "🌐 Service: checkpoint.service"
+echo ""
+echo "Check status:"
+echo "  systemctl status checkpoint.service"
+echo ""
+echo "View logs:"
+echo "  journalctl -u checkpoint.service -f"

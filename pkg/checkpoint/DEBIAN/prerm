@@ -1,4 +1,8 @@
 #!/bin/sh
 set -e
+
+echo "Stopping Checkpoint service..."
 systemctl stop checkpoint.service || true
 systemctl disable checkpoint.service || true
+
+echo "Checkpoint service stopped and disabled."
