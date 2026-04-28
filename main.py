@@ -15,12 +15,49 @@ from app.MFRC522Handler import myRFIDReader
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from gpiozero import TonalBuzzer
+from time import sleep
+BUZZER_PIN = 18
+
 # --- Logging Setup ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("rfid_app")
+
+class BuzzerHandler:
+    def __init__(self, pin):
+        try:
+            self.buzzer = TonalBuzzer(pin, octaves=3)
+        except Exception as e:
+            print(f"Buzzer init failed: {e}")
+            self.buzzer = None
+
+    def success_beep(self):
+        """Short high beep for successful scan"""
+        if self.buzzer:
+            # Three quick rising notes (C5, E5, G5) 
+            # High frequency for outdoor piercing power
+            for freq in [1046, 1318, 1568]: 
+                self.buzzer.play(freq)
+                sleep(0.08) # Short and punchy
+            
+            # Hold the last note slightly longer for 'triumph'
+            self.buzzer.play(2093) # C6 (High C)
+            sleep(0.15)
+            self.buzzer.stop()
+
+    def error_beep(self):
+        """Two low beeps for error"""
+        if self.buzzer:
+            for _ in range(2):
+                self.buzzer.play(400) 
+                sleep(0.25)
+                self.buzzer.stop()
+                sleep(0.1)
+
+buzzer = BuzzerHandler(BUZZER_PIN)
 
 class UserDataMessage(BaseModel):
     name: str; surname: str; id: int; best_time: int; lap_count: int
@@ -68,6 +105,7 @@ def rfid_reader_thread(q, stop_evt):
 
 async def send_error_msg(websocket):
     msg = UserDataMessage(id=-1, name="Error", surname="Error", best_time=0, lap_count=0)
+    buzzer.error_beep()
     await websocket.send_text(msg.model_dump_json())
 
 app.mount("/static", StaticFiles(directory="./static", html=True), name="static")
@@ -102,9 +140,19 @@ async def websocket_endpoint(websocket: WebSocket):
                         if not res:
                             logger.warning(f"No runner for tag {tag_id}")
                             await send_error_msg(websocket)
+                            buzzer.error_beep()
                             continue
 
-                        part = Participate.model_validate(res[0])
+                        # TRIGGER SUCCESS BEEP
+                        buzzer.success_beep()
+                        
+                        try:
+                            part = Participate.model_validate(res[0])
+                        except Exception:
+                            buzzer.error_beep()
+                            logger.warning(f"Malformed JSON for tag {tag_id}")
+                            await send_error_msg(websocket)
+                            continue
 
                         # Record Round
                         ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
