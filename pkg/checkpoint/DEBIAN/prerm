@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
-echo "Stopping Checkpoint service..."
+echo "Stopping Checkpoint services..."
 systemctl stop checkpoint.service || true
 systemctl disable checkpoint.service || true
+systemctl stop checkpoint-browser.service || true
+systemctl disable checkpoint-browser.service || true
 
-echo "Checkpoint service stopped and disabled."
+echo "Checkpoint services stopped and disabled."

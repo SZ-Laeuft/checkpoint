@@ -1,0 +1,15 @@
+[Unit]
+Description=Checkpoint Firefox Browser Launcher
+After=checkpoint.service
+Wants=checkpoint.service display-manager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/firefox --new-instance --kiosk http://localhost:8000/static
+User=checkpoint
+Environment=DISPLAY=:0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

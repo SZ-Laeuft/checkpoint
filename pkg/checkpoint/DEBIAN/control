@@ -4,7 +4,7 @@ Section: utils
 Priority: optional
 Architecture: arm64
 Maintainer: Maximilian Dorninger <maximilian.dorninger@sz-ybbs.ac.at>
-Depends: python3 (>= 3.11), python3-venv, python3-pip
+Depends: python3 (>= 3.11), python3-venv, python3-pip, firefox
 Recommends: nodejs (>= 20)
 Description: RFID checkpoint FastAPI service with Svelte frontend
  NFC reader checkpoint system with real-time WebSocket updates.

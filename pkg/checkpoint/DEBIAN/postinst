@@ -38,7 +38,7 @@ echo "✓ Verifying dependencies..."
 # Step 6: Set permissions
 chmod 755 "$APP_DIR"
 
-# Step 7: Enable and start systemd service
+# Step 7: Enable and start systemd services
 echo "🚀 Enabling Checkpoint service..."
 systemctl daemon-reload
 systemctl enable checkpoint.service
@@ -46,6 +46,13 @@ systemctl enable checkpoint.service
 # Only start if not already running
 if ! systemctl is-active --quiet checkpoint.service; then
     systemctl start checkpoint.service
+fi
+
+# Step 8: Enable Firefox browser launcher (optional)
+echo "🌐 Enabling Firefox browser launcher..."
+systemctl enable checkpoint-browser.service
+if ! systemctl is-active --quiet checkpoint-browser.service; then
+    systemctl start checkpoint-browser.service
 fi
 
 echo "✅ Checkpoint installed successfully!"

@@ -3,6 +3,7 @@ set -e
 
 PROJECT_ROOT="/home/checkpoint/checkpoint"
 PKG_DIR="$PROJECT_ROOT/pkg/checkpoint/opt/checkpoint"
+OUTPUT_DEB="$PROJECT_ROOT/pkg/checkpoint_0.1.0_arm64.deb"
 
 echo "🔨 Building Checkpoint Debian Package"
 echo "======================================"
@@ -44,12 +45,12 @@ rsync -a \
 # Step 6: Build .deb
 echo "📦 Building .deb package..."
 dpkg-deb --build "$PROJECT_ROOT/pkg/checkpoint"
-mv "$PROJECT_ROOT/pkg/checkpoint.deb" "$PROJECT_ROOT/pkg/checkpoint_0.1.0_arm64.deb"
+mv "$PROJECT_ROOT/pkg/checkpoint.deb" "$OUTPUT_DEB"
 
-echo "✅ Package built: $PROJECT_ROOT/pkg/checkpoint_0.1.0_arm64.deb"
+echo "✅ Package built: $OUTPUT_DEB"
 echo ""
 echo "📥 To install on target system:"
-echo "   sudo apt install -y ./checkpoint_0.1.0_arm64.deb"
+echo "   sudo apt install -y ./pkg/checkpoint_0.1.0_arm64.deb"
 echo ""
 echo "🚀 Service will auto-start. Check status with:"
 echo "   sudo systemctl status checkpoint.service"

@@ -138,19 +138,14 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Fetch Participant
                         res = session.get(f"{API_URL}/participates/by-tagId/{tag_id}").json()
                         if not res:
-                            logger.warning(f"No runner for tag {tag_id}")
+                            logger.warning(f"No runner for tag {tag_id} (response object: {res})")
                             await send_error_msg(websocket)
-                            buzzer.error_beep()
                             continue
-
-                        # TRIGGER SUCCESS BEEP
-                        buzzer.success_beep()
                         
                         try:
                             part = Participate.model_validate(res[0])
                         except Exception:
-                            buzzer.error_beep()
-                            logger.warning(f"Malformed JSON for tag {tag_id}")
+                            logger.warning(f"Malformed JSON for tag {tag_id} (response object: {res})")
                             await send_error_msg(websocket)
                             continue
 
@@ -172,6 +167,9 @@ async def websocket_endpoint(websocket: WebSocket):
                             id=runner.runnerId, name=runner.firstname or "",
                             surname=runner.lastname or "", best_time=best_time, lap_count=count
                         )
+                        
+                        # TRIGGER SUCCESS BEEP
+                        buzzer.success_beep()
                         await websocket.send_text(user.model_dump_json())
 
                     except Exception:
