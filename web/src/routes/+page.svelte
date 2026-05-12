@@ -17,12 +17,27 @@
 
         };
     });
+    function pad(n: number, z: number = 2): string {
+        z = z || 2;
+        return ('00' + n).slice(-z);
+    }
+    function msToTime(seconds: number): string {
+        if (!Number.isFinite(seconds)) return '--:--';
 
+        const msTotal = Math.round(seconds * 1000);
+        const hrs = Math.floor(msTotal / 3600000);
+        const mins = Math.floor((msTotal % 3600000) / 60000);
+        const secs = Math.floor((msTotal % 60000) / 1000);
+        const milli = msTotal % 1000;
+
+        if (hrs > 0) {
+            return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+        }
+
+        return `${pad(mins)}:${pad(secs)}`;
+    }
     function formatTime(date: Date): string {
         return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
-    }
-    function pad(num: number): string {
-        return num.toString().padStart(2, '0');
     }
 </script>
 
@@ -44,7 +59,7 @@
                 <li>{user.name} {user.surname}</li>
                 <div class="text-[0.7em]">
                     <li>Rundenanzahl: {user.lap_count}</li>
-                    <li>Bestzeit: {user.best_time}</li>
+                    <li>Bestzeit: {msToTime(user.best_time)}</li>
                 </div>
             </ol>
         </div>

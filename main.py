@@ -66,7 +66,12 @@ class Runner(BaseModel):
     runnerId: int; firstname: str | None; lastname: str | None; gender: str | None; birthdate: str | None
 
 class Participate(BaseModel):
-    participateId: int; runnerId: int | None; tagId: str | None
+    participateId: int
+    runnerId: int | None
+    tagId: str | None
+    teamId: int | None
+    eventId: int | None
+    categoryId: int 
 
 # Global state
 stop_event = threading.Event()
@@ -135,19 +140,34 @@ async def websocket_endpoint(websocket: WebSocket):
                         tag_id = int(uid, 16)
                         logger.info(f"Tag Detected: {tag_id}")
 
-                        # Fetch Participant
+                        # Get active event
+                        events = session.get(f"{API_URL}/events").json()
+                        active_event = next((e for e in events if str(e.get("isActive")).lower() == "true"), None)
+
+                        if not active_event:
+                            logger.warning("No active event found")
+                            await send_error_msg(websocket)
+                            continue
+
+                        current_event_id = active_event["eventId"]
+                        logger.info(f"Active event: {current_event_id}")
+
+                        # Fetch participates for tag
                         res = session.get(f"{API_URL}/participates/by-tagId/{tag_id}").json()
                         if not res:
                             logger.warning(f"No runner for tag {tag_id} (response object: {res})")
                             await send_error_msg(websocket)
                             continue
-                        
-                        try:
-                            part = Participate.model_validate(res[0])
-                        except Exception:
-                            logger.warning(f"Malformed JSON for tag {tag_id} (response object: {res})")
+
+                        # Keep only participates for the active event
+                        matched = [p for p in res if p.get("eventId") == current_event_id]
+
+                        if not matched:
+                            logger.warning(f"No participate for tag {tag_id} in active event {current_event_id}")
                             await send_error_msg(websocket)
                             continue
+
+                        part = Participate.model_validate(matched[0])
 
                         # Record Round
                         ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
@@ -157,7 +177,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         runner_data = session.get(f"{API_URL}/runners/{part.runnerId}").json()
                         runner = Runner.model_validate(runner_data)
 
-                        bt_res = session.get(f"{API_URL}/besttime/{part.runnerId}").json()
+                        bt_res = session.get(f"{API_URL}/besttime/{part.participateId}").json()
                         best_time = int(bt_res.get("bestTime", 0))
 
                         rc_res = session.get(f"{API_URL}/rounds/get-round-count/{part.participateId}")

@@ -2,14 +2,14 @@ export interface UserData {
     id: number | null;
     name: string;
     surname: string;
-    best_time: string;
+    best_time: number;
     lap_count: number;
 }
 const initialState: UserData = {
     id: null,
     name: '',
     surname: '',
-    best_time: '',
+    best_time: 0,
     lap_count: 0
 };
 
@@ -85,7 +85,7 @@ export function connectWebSocket(url: string) {
                     user.id = data.id;
                     user.name = typeof data.name === 'string' ? data.name : '';
                     user.surname = typeof data.surname === 'string' ? data.surname : '';
-                    user.best_time = typeof data.best_time === 'string' ? data.best_time : '';
+                    user.best_time = typeof data.best_time === 'number' ? data.best_time : 0;
                     user.lap_count = typeof data.lap_count === 'number' ? data.lap_count : 0;
 
                     // Always restart clear timer on each scan
