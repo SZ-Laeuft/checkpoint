@@ -28,7 +28,6 @@
         const hrs = Math.floor(msTotal / 3600000);
         const mins = Math.floor((msTotal % 3600000) / 60000);
         const secs = Math.floor((msTotal % 60000) / 1000);
-        const milli = msTotal % 1000;
 
         if (hrs > 0) {
             return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
