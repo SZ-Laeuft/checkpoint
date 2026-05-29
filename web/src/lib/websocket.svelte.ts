@@ -4,13 +4,15 @@ export interface UserData {
     surname: string;
     best_time: number;
     lap_count: number;
+    round_time: number;
 }
 const initialState: UserData = {
     id: null,
     name: '',
     surname: '',
     best_time: 0,
-    lap_count: 0
+    lap_count: 0,
+    round_time: 0
 };
 
 export let user: UserData = $state(initialState);
@@ -87,7 +89,8 @@ export function connectWebSocket(url: string) {
                     user.surname = typeof data.surname === 'string' ? data.surname : '';
                     user.best_time = typeof data.best_time === 'number' ? data.best_time : 0;
                     user.lap_count = typeof data.lap_count === 'number' ? data.lap_count : 0;
-
+                    user.round_time = typeof data.round_time === 'number' ? data.round_time : 0;
+                    
                     // Always restart clear timer on each scan
                     clearTimeout(clearUserTimeout);
                     const currentId = user.id;

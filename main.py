@@ -60,7 +60,7 @@ class BuzzerHandler:
 buzzer = BuzzerHandler(BUZZER_PIN)
 
 class UserDataMessage(BaseModel):
-    name: str; surname: str; id: int; best_time: int; lap_count: int
+    name: str; surname: str; id: int; best_time: int; lap_count: int; round_time: int
 
 class Runner(BaseModel):
     runnerId: int; firstname: str | None; lastname: str | None; gender: str | None; birthdate: str | None
@@ -71,7 +71,15 @@ class Participate(BaseModel):
     tagId: str | None
     teamId: int | None
     eventId: int | None
-    categoryId: int 
+    categoryId: int
+
+class Round(BaseModel):
+    roundId: int
+    participateId: int
+    roundTimestamp: str
+    roundTime: int
+    isValid: bool
+
 
 # Global state
 stop_event = threading.Event()
@@ -183,12 +191,16 @@ async def websocket_endpoint(websocket: WebSocket):
                         bt_res = session.get(f"{API_URL}/besttime/{part.participateId}").json()
                         best_time = int(bt_res.get("bestTime", 0))
 
+                        round_res = session.get(f"{API_URL}/rounds/by-participateId/{part.participateId}").json()
+                        round_time = int(round_res.get("roundTime", 0))
+
                         rc_res = session.get(f"{API_URL}/rounds/get-round-count/{part.participateId}")
                         count = int(rc_res.content)
 
                         user = UserDataMessage(
                             id=runner.runnerId, name=runner.firstname or "",
-                            surname=runner.lastname or "", best_time=best_time, lap_count=count
+                            surname=runner.lastname or "", best_time=best_time, lap_count=count,
+                            round_time=round_time
                         )
                         
                         # TRIGGER SUCCESS BEEP
