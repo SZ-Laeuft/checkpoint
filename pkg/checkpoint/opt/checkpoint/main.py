@@ -137,8 +137,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 with requests.Session() as session:
                     try:
-                        tag_id = int(uid, 16)
-                        logger.info(f"Tag Detected: {tag_id}")
+                        reversed_hex = uid[6:8] + uid[4:6] + uid[2:4] + uid[0:2]
+
+                        tag_id = f"{int(reversed_hex, 16):010d}"
+
+                        logger.info(f"sending uid: {tag_id}")
 
                         # Get active event
                         events = session.get(f"{API_URL}/events").json()
