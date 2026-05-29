@@ -5,7 +5,7 @@ Wants=checkpoint.service display-manager.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/firefox --new-instance --kiosk http://localhost:8000/static
+ExecStart=/usr/bin/chromium-browser --kiosk --disable-cache --disk-cache-size=1 --media-cache-size=1 --noerrdialogs --disable-infobars --incognito http://localhost:8000/static
 User=checkpoint
 Environment=DISPLAY=:0
 Restart=always
