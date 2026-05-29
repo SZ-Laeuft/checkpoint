@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PROJECT_ROOT="/home/checkpoint/checkpoint"
+PROJECT_ROOT="/home/checkpoint/nfc-reader"
 PKG_DIR="$PROJECT_ROOT/pkg/checkpoint/opt/checkpoint"
 OUTPUT_DEB="$PROJECT_ROOT/pkg/checkpoint_0.1.0_arm64.deb"
 
