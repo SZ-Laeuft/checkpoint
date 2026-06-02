@@ -117,7 +117,7 @@ def rfid_reader_thread(q, stop_evt):
     logger.info("Hardware loop exited.")
 
 async def send_error_msg(websocket):
-    msg = UserDataMessage(id=-1, name="Error", surname="Error", best_time=0, lap_count=0)
+    msg = UserDataMessage(id=-1, name="Error", surname="Error", best_time=0, lap_count=0, round_time=0)
     buzzer.error_beep()
     await websocket.send_text(msg.model_dump_json())
 
@@ -173,7 +173,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Keep only participates for the active event
                         matched = [p for p in res if p.get("eventId") == current_event_id]
 
-                        if not matched:
+                        if not isinstance(res, list) or not res:
                             logger.warning(f"No participate for tag {tag_id} in active event {current_event_id}")
                             await send_error_msg(websocket)
                             continue
