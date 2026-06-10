@@ -80,6 +80,9 @@ class Round(BaseModel):
     roundTime: int
     isValid: bool
 
+class Tag(BaseModel):
+    tagId: str
+    status: str
 
 # Global state
 stop_event = threading.Event()
@@ -150,7 +153,17 @@ async def websocket_endpoint(websocket: WebSocket):
                         tag_id = f"{int(reversed_hex, 16):010d}"
 
                         logger.info(f"sending uid: {tag_id}")
-
+                        
+                        # check if tag is active
+                        logger.info(f"Fetching status for tag {tag_id}...")
+                        status_res = session.get(f"{API_URL}/tags/{tag_id}").json()
+                        status = Tag.model_validate(status_res)
+                        logger.info(f"Tag status: {status.status}")
+                        if status.status.lower() == "free":
+                            logger.warning(f"Tag {tag_id} is not active (free)")
+                            await send_error_msg(websocket)
+                            continue
+                        
                         # Get active event
                         events = session.get(f"{API_URL}/events").json()
                         active_event = next((e for e in events if str(e.get("isActive")).lower() == "true"), None)
@@ -165,7 +178,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
                         # Fetch participates for tag
                         res = session.get(f"{API_URL}/participates/by-tagId/{tag_id}").json()
-                        if not res:
+                        logger.info(res)
+                        if not isinstance(res, list) or not res:
                             logger.warning(f"No runner for tag {tag_id} (response object: {res})")
                             await send_error_msg(websocket)
                             continue
@@ -179,7 +193,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             continue
 
                         part = Participate.model_validate(matched[0])
-
+                        
                         # Record Round
                         ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
                         session.post(f"{API_URL}/rounds/", json={"participateid": part.participateId, "roundtimestamp": ts})
@@ -192,9 +206,13 @@ async def websocket_endpoint(websocket: WebSocket):
                         best_time = int(bt_res.get("bestTime", 0))
 
                         round_res = session.get(f"{API_URL}/rounds/by-participateId/{part.participateId}").json()
-                        round_time = int(round_res.get("roundTime", 0))
+                        raw_round_time = round_res.get("roundTime", 0)
+                        if raw_round_time is not None:
+                            round_time = int(raw_round_time)
+                        else:
+                            round_time = 0
 
-                        rc_res = session.get(f"{API_URL}/rounds/get-round-count/{part.participateId}")
+                        rc_res = session.get(f"{API_URL}/rounds/get-round-count/is_valid/{part.participateId}")
                         count = int(rc_res.content)
 
                         user = UserDataMessage(
