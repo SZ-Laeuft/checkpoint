@@ -52,6 +52,14 @@
             <p class="text-center text-5xl">Fehler!</p>
             <p class="text-center text-xs">Melde dich bei den Veranstaltern!</p>
         </div>
+    {:else if user.lap_count == 0}
+        <div class="w-screen h-screen text-white flex flex-col items-center justify-center gap-4 bg-green-600 p-4">
+            <ol>
+                <li>Willkommen {user.name} {user.surname}!</li>
+                <li>Du kannst zu laufen beginnen!</li>
+                <li>Viel Spaß!</li>
+            </ol>
+        </div>
     {:else}
         <div class="w-screen h-screen text-white flex flex-col items-center justify-center gap-4 bg-green-600 p-4">
             <ol>
