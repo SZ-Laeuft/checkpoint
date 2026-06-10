@@ -60,7 +60,7 @@ class BuzzerHandler:
 buzzer = BuzzerHandler(BUZZER_PIN)
 
 class UserDataMessage(BaseModel):
-    name: str; surname: str; id: int; best_time: int; lap_count: int
+    name: str; surname: str; id: int; best_time: int; lap_count: int; round_time: int
 
 class Runner(BaseModel):
     runnerId: int; firstname: str | None; lastname: str | None; gender: str | None; birthdate: str | None
@@ -71,7 +71,15 @@ class Participate(BaseModel):
     tagId: str | None
     teamId: int | None
     eventId: int | None
-    categoryId: int 
+    categoryId: int
+
+class Round(BaseModel):
+    roundId: int
+    participateId: int
+    roundTimestamp: str
+    roundTime: int
+    isValid: bool
+
 
 # Global state
 stop_event = threading.Event()
@@ -109,7 +117,7 @@ def rfid_reader_thread(q, stop_evt):
     logger.info("Hardware loop exited.")
 
 async def send_error_msg(websocket):
-    msg = UserDataMessage(id=-1, name="Error", surname="Error", best_time=0, lap_count=0)
+    msg = UserDataMessage(id=-1, name="Error", surname="Error", best_time=0, lap_count=0, round_time=0)
     buzzer.error_beep()
     await websocket.send_text(msg.model_dump_json())
 
@@ -165,7 +173,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Keep only participates for the active event
                         matched = [p for p in res if p.get("eventId") == current_event_id]
 
-                        if not matched:
+                        if not isinstance(res, list) or not res:
                             logger.warning(f"No participate for tag {tag_id} in active event {current_event_id}")
                             await send_error_msg(websocket)
                             continue
@@ -183,12 +191,16 @@ async def websocket_endpoint(websocket: WebSocket):
                         bt_res = session.get(f"{API_URL}/besttime/{part.participateId}").json()
                         best_time = int(bt_res.get("bestTime", 0))
 
+                        round_res = session.get(f"{API_URL}/rounds/by-participateId/{part.participateId}").json()
+                        round_time = int(round_res.get("roundTime", 0))
+
                         rc_res = session.get(f"{API_URL}/rounds/get-round-count/{part.participateId}")
                         count = int(rc_res.content)
 
                         user = UserDataMessage(
                             id=runner.runnerId, name=runner.firstname or "",
-                            surname=runner.lastname or "", best_time=best_time, lap_count=count
+                            surname=runner.lastname or "", best_time=best_time, lap_count=count,
+                            round_time=round_time
                         )
                         
                         # TRIGGER SUCCESS BEEP

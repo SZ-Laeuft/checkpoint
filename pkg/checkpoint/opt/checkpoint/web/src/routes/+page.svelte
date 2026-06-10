@@ -59,6 +59,7 @@
                 <div class="text-[0.7em]">
                     <li>Rundenanzahl: {user.lap_count}</li>
                     <li>Bestzeit: {msToTime(user.best_time)}</li>
+                    <li>Rundenzeit: {msToTime(user.round_time)}</li>
                 </div>
             </ol>
         </div>

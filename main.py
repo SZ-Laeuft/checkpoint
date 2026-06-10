@@ -187,7 +187,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Keep only participates for the active event
                         matched = [p for p in res if p.get("eventId") == current_event_id]
 
-                        if not matched:
+                        if not isinstance(res, list) or not res:
                             logger.warning(f"No participate for tag {tag_id} in active event {current_event_id}")
                             await send_error_msg(websocket)
                             continue
